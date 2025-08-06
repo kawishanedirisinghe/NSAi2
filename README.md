@@ -1,8 +1,8 @@
-# OpenManus AI - Enhanced Multi-User Platform
+# OpenManus AI - Multi-User Platform
 
-🚀 **Advanced AI Platform with Multi-User Support, VM Optimization, and Real-Time Collaboration**
+🚀 **Advanced AI Platform with Multi-User Support and Real-Time Collaboration**
 
-OpenManus AI is a comprehensive, production-ready AI platform designed for multi-user environments, VM deployments, and enterprise use. It features advanced user management, real-time WebSocket communication, VM resource monitoring, and AI model optimization.
+OpenManus AI is a comprehensive, production-ready AI platform designed for multi-user environments and enterprise use. It features advanced user management, real-time WebSocket communication, and AI model integration.
 
 ## ✨ Key Features
 
@@ -19,26 +19,15 @@ OpenManus AI is a comprehensive, production-ready AI platform designed for multi
 - Typing indicators and user presence
 - Message history and persistence
 
-### 🖥️ **VM Resource Management**
-- Real-time CPU, Memory, and GPU monitoring
-- Automated resource alerting and thresholds
-- VM optimization recommendations
-- Auto-scaling capabilities
-- Performance metrics and analytics
+### 📊 **System Monitoring**
+- Basic system health monitoring
+- Resource usage tracking
+- Application performance metrics
 
 ### 🤖 **AI Model Integration**
 - Multi-model support and management
-- Resource-aware model loading
 - Request tracking and performance monitoring
-- GPU utilization optimization
 - Model lifecycle management
-
-### 📊 **Advanced Monitoring & Analytics**
-- System health monitoring
-- Resource usage analytics
-- User activity tracking
-- Performance metrics dashboard
-- Prometheus and Grafana integration
 
 ### 🐳 **Production-Ready Deployment**
 - Docker containerization
@@ -54,8 +43,7 @@ OpenManus AI is a comprehensive, production-ready AI platform designed for multi
 - Docker and Docker Compose
 - Python 3.11+ (for local development)
 - Git
-- 4GB+ RAM recommended
-- NVIDIA GPU (optional, for AI acceleration)
+- 2GB+ RAM recommended
 
 ### One-Command Installation
 
@@ -122,22 +110,10 @@ POST /api/auth/login
 }
 ```
 
-#### System Monitoring
+#### System Health
 ```bash
 # System health
 GET /api/system/health
-
-# Current metrics
-GET /api/system/metrics
-
-# Metrics history
-GET /api/system/metrics/history?hours=24
-
-# System alerts
-GET /api/system/alerts
-
-# Optimization recommendations
-GET /api/system/optimize
 ```
 
 #### Chat Rooms
@@ -202,7 +178,6 @@ socket.on('new_message', (data) => {
 - **PostgreSQL**: Primary database for user data and chat history
 - **Redis**: Session storage and caching
 - **WebSocket Manager**: Real-time communication handling
-- **VM Resource Manager**: System monitoring and optimization
 - **Authentication System**: Secure user management
 
 ## 🛠️ Development
@@ -255,25 +230,11 @@ python -m pytest --cov=app tests/
 
 ### Built-in Monitoring
 
-Access the monitoring dashboard at `/api/system/health` to view:
-- CPU, Memory, and GPU utilization
+Access the system health endpoint at `/api/system/health` to view:
+- Basic system status
+- CPU and memory usage
 - Active user sessions
 - WebSocket connections
-- AI model status
-- System alerts and recommendations
-
-### External Monitoring (Optional)
-
-Enable Prometheus and Grafana for advanced monitoring:
-
-```bash
-# Start monitoring services
-docker-compose --profile monitoring up -d
-
-# Access Grafana
-open http://localhost:3000
-# Username: admin, Password: admin123
-```
 
 ## 🔧 Configuration
 
@@ -288,11 +249,6 @@ HTTPS=false
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:port/db
-
-# VM Monitoring
-VM_CPU_THRESHOLD=80.0
-VM_MEMORY_THRESHOLD=85.0
-VM_AUTO_SCALING=true
 
 # WebSocket
 WS_PING_TIMEOUT=60
@@ -316,7 +272,7 @@ deploy:
 
 ## 🚀 Deployment Options
 
-### VM Deployment
+### Standard Deployment
 
 ```bash
 # One-command deployment
@@ -324,7 +280,6 @@ deploy:
 
 # Or step by step
 ./deploy.sh start
-./deploy.sh monitoring
 ./deploy.sh status
 ```
 
@@ -333,7 +288,7 @@ deploy:
 #### AWS EC2
 ```bash
 # Launch EC2 instance (Ubuntu 22.04 LTS)
-# Recommended: t3.large or larger with 4GB+ RAM
+# Recommended: t3.small or larger with 2GB+ RAM
 
 # SSH into instance and run
 git clone https://github.com/your-org/openmanus-ai.git
@@ -345,7 +300,7 @@ cd openmanus-ai
 ```bash
 # Create VM instance
 gcloud compute instances create openmanus-ai \
-  --machine-type=e2-standard-2 \
+  --machine-type=e2-small \
   --image-family=ubuntu-2204-lts \
   --image-project=ubuntu-os-cloud
 
@@ -424,11 +379,11 @@ curl -H "Connection: Upgrade" -H "Upgrade: websocket" http://localhost:5000/sock
 
 #### High resource usage
 ```bash
-# Check system metrics
-curl http://localhost:5000/api/system/metrics
+# Check system health
+curl http://localhost:5000/api/system/health
 
-# View optimization recommendations
-curl http://localhost:5000/api/system/optimize
+# Monitor Docker containers
+docker stats
 ```
 
 ### Support
@@ -460,6 +415,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**OpenManus AI** - Empowering multi-user AI collaboration with enterprise-grade features and VM optimization.
+**OpenManus AI** - Empowering multi-user AI collaboration with enterprise-grade features.
 
 For more information, visit our [documentation](https://docs.openmanus.ai) or join our [community](https://community.openmanus.ai).

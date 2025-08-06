@@ -63,11 +63,9 @@ fastapi==0.115.11
 uvicorn==0.34.0
 pyyaml==6.0.2
 
-# VM and Deployment
+# Deployment
 gunicorn
 redis
-celery
 
-# Monitoring and Analytics
+# Basic System Monitoring
 psutil
-prometheus-client

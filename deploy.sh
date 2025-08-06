@@ -79,24 +79,10 @@ detect_system() {
     # CPU cores
     CPU_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "unknown")
     
-    # GPU detection
-    GPU_AVAILABLE="false"
-    if command -v nvidia-smi &> /dev/null; then
-        GPU_COUNT=$(nvidia-smi --query-gpu=count --format=csv,noheader,nounits | head -1)
-        if [[ $GPU_COUNT -gt 0 ]]; then
-            GPU_AVAILABLE="true"
-            GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader | head -1)
-        fi
-    fi
-    
     log "System Information:"
     log "  OS: $DISTRO $VERSION ($ARCH)"
     log "  Memory: ${MEMORY_GB}GB"
     log "  CPU Cores: $CPU_CORES"
-    log "  GPU Available: $GPU_AVAILABLE"
-    if [[ "$GPU_AVAILABLE" == "true" ]]; then
-        log "  GPU Info: $GPU_INFO"
-    fi
 }
 
 # Install system dependencies
@@ -163,34 +149,14 @@ install_docker() {
     log "Docker installed successfully"
 }
 
-# Install NVIDIA Docker (for GPU support)
-install_nvidia_docker() {
-    if [[ "$GPU_AVAILABLE" != "true" ]]; then
-        return
-    fi
-    
-    log "Installing NVIDIA Docker runtime..."
-    
-    if [[ "$OS" == "linux" ]]; then
-        # Add NVIDIA Docker repository
-        distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-        curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-        curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-        
-        sudo apt-get update
-        sudo apt-get install -y nvidia-docker2
-        sudo systemctl restart docker
-        
-        log "NVIDIA Docker installed successfully"
-    fi
-}
+
 
 # Setup environment
 setup_environment() {
     log "Setting up environment..."
     
     # Create necessary directories
-    mkdir -p workspace uploads logs backups config monitoring/grafana/{dashboards,datasources}
+    mkdir -p workspace uploads logs backups config
     
     # Copy environment file if it doesn't exist
     if [[ ! -f .env ]]; then
@@ -255,35 +221,7 @@ start_services() {
     done
 }
 
-# Setup monitoring (optional)
-setup_monitoring() {
-    read -p "Do you want to set up monitoring (Prometheus + Grafana)? [y/N]: " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log "Setting up monitoring services..."
-        
-        # Create monitoring configuration
-        cat > monitoring/prometheus.yml << EOF
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
 
-scrape_configs:
-  - job_name: 'openmanus'
-    static_configs:
-      - targets: ['openmanus:5000']
-    metrics_path: '/api/system/metrics'
-    scrape_interval: 30s
-EOF
-        
-        # Start monitoring services
-        docker-compose --profile monitoring up -d
-        
-        log "Monitoring services started"
-        log "Grafana: http://localhost:3000 (admin/admin123)"
-        log "Prometheus: http://localhost:9090"
-    fi
-}
 
 # Create backup
 create_backup() {
@@ -368,9 +306,8 @@ show_menu() {
     echo "4. Show Status"
     echo "5. Create Backup"
     echo "6. Update Platform"
-    echo "7. Setup Monitoring"
-    echo "8. Cleanup"
-    echo "9. Exit"
+    echo "7. Cleanup"
+    echo "8. Exit"
     echo
 }
 
@@ -386,16 +323,14 @@ main() {
         # Interactive mode
         while true; do
             show_menu
-            read -p "Select an option [1-9]: " choice
+            read -p "Select an option [1-8]: " choice
             
             case $choice in
                 1)
                     install_dependencies
                     install_docker
-                    install_nvidia_docker
                     setup_environment
                     start_services
-                    setup_monitoring
                     show_status
                     ;;
                 2)
@@ -414,12 +349,9 @@ main() {
                     update
                     ;;
                 7)
-                    setup_monitoring
-                    ;;
-                8)
                     cleanup
                     ;;
-                9)
+                8)
                     log "Goodbye!"
                     exit 0
                     ;;
@@ -437,7 +369,6 @@ main() {
             install)
                 install_dependencies
                 install_docker
-                install_nvidia_docker
                 setup_environment
                 start_services
                 ;;
@@ -456,14 +387,11 @@ main() {
             update)
                 update
                 ;;
-            monitoring)
-                setup_monitoring
-                ;;
             cleanup)
                 cleanup
                 ;;
             *)
-                echo "Usage: $0 [install|start|stop|status|backup|update|monitoring|cleanup]"
+                echo "Usage: $0 [install|start|stop|status|backup|update|cleanup]"
                 exit 1
                 ;;
         esac

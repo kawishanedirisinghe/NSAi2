@@ -28,7 +28,6 @@ from app.tool.ask_human import AskHuman
 # Import new modules
 from app.models import db, User, ChatRoom, UserRole
 from app.auth import auth_bp, login_manager
-from app.vm_manager import vm_manager
 from app.websocket_manager import websocket_manager
 
 app = Flask(__name__)
@@ -1090,68 +1089,25 @@ def submit_response():
 
     return jsonify({'status': 'success', 'message': 'Response submitted'})
 
-# VM Monitoring and System Health Endpoints
+# Basic System Health Endpoint
 @app.route('/api/system/health')
 def system_health():
-    """Get system health status"""
+    """Get basic system health status"""
     try:
-        health_data = vm_manager.get_system_health()
+        import psutil
+        
+        health_data = {
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'uptime': time.time(),
+            'memory_usage': psutil.virtual_memory().percent,
+            'cpu_usage': psutil.cpu_percent(),
+            'disk_usage': psutil.disk_usage('/').percent
+        }
         return jsonify(health_data)
     except Exception as e:
         logger.error(f"Error getting system health: {e}")
-        return jsonify({'error': 'Failed to get system health'}), 500
-
-@app.route('/api/system/metrics')
-def system_metrics():
-    """Get current system metrics"""
-    try:
-        metrics = vm_manager.get_current_metrics()
-        return jsonify(metrics)
-    except Exception as e:
-        logger.error(f"Error getting system metrics: {e}")
-        return jsonify({'error': 'Failed to get system metrics'}), 500
-
-@app.route('/api/system/metrics/history')
-def system_metrics_history():
-    """Get system metrics history"""
-    try:
-        hours = request.args.get('hours', 1, type=int)
-        history = vm_manager.get_metrics_history(hours)
-        return jsonify({'history': history})
-    except Exception as e:
-        logger.error(f"Error getting metrics history: {e}")
-        return jsonify({'error': 'Failed to get metrics history'}), 500
-
-@app.route('/api/system/alerts')
-def system_alerts():
-    """Get system alerts"""
-    try:
-        max_alerts = request.args.get('max', 50, type=int)
-        alerts = vm_manager.get_alerts(max_alerts)
-        return jsonify({'alerts': alerts})
-    except Exception as e:
-        logger.error(f"Error getting system alerts: {e}")
-        return jsonify({'error': 'Failed to get system alerts'}), 500
-
-@app.route('/api/system/optimize')
-def system_optimize():
-    """Get VM optimization recommendations"""
-    try:
-        recommendations = vm_manager.optimize_for_vm()
-        return jsonify(recommendations)
-    except Exception as e:
-        logger.error(f"Error getting optimization recommendations: {e}")
-        return jsonify({'error': 'Failed to get optimization recommendations'}), 500
-
-@app.route('/api/models/status')
-def model_status():
-    """Get AI model statuses"""
-    try:
-        statuses = vm_manager.get_model_statuses()
-        return jsonify({'models': statuses})
-    except Exception as e:
-        logger.error(f"Error getting model statuses: {e}")
-        return jsonify({'error': 'Failed to get model statuses'}), 500
+        return jsonify({'error': 'Failed to get system health', 'status': 'error'}), 500
 
 @app.route('/api/websocket/stats')
 def websocket_stats():
@@ -1255,16 +1211,13 @@ if __name__ == "__main__":
     # Initialize database
     initialize_database()
     
-    # Start VM monitoring
-    vm_manager.start_monitoring(interval=30)
-    
     # Create necessary directories at startup
     os.makedirs(app.config['WORKSPACE'], exist_ok=True)
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     
     # Start the Flask app with SocketIO
-    logger.info("Starting Enhanced OpenManus AI Platform...")
-    logger.info("Features: Multi-user auth, WebSocket chat, VM monitoring, AI models")
+    logger.info("Starting OpenManus AI Platform...")
+    logger.info("Features: Multi-user auth, WebSocket chat, AI models")
     
     # Use SocketIO's run method instead of Flask's run
     websocket_manager.socketio.run(
