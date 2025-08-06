@@ -1,5 +1,9 @@
-# app.py
+# app.py - Enhanced Multi-User AI Platform with VM Optimization
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_login import LoginManager
+from flask_cors import CORS
 import mimetypes
 import os
 import time
@@ -21,20 +25,50 @@ from werkzeug.utils import secure_filename
 import shutil
 from app.tool.ask_human import AskHuman
 
+# Import new modules
+from app.models import db, User, ChatRoom, UserRole
+from app.auth import auth_bp, login_manager
+from app.vm_manager import vm_manager
+from app.websocket_manager import websocket_manager
 
 app = Flask(__name__)
+
+# Enhanced Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///openmanus.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WORKSPACE'] = 'workspace'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['CHAT_HISTORY_FILE'] = 'chat_history.json'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Security Headers
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('HTTPS', 'false').lower() == 'true'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Initialize extensions
+db.init_app(app)
+migrate = Migrate(app, db)
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
+login_manager.login_message = 'Please log in to access this page.'
+
+# Enable CORS for WebSocket and API
+CORS(app, origins="*", supports_credentials=True)
+
+# Initialize WebSocket manager
+websocket_manager.init_app(app)
+
+# Register blueprints
+app.register_blueprint(auth_bp)
+
 # Create necessary directories
 os.makedirs(app.config['WORKSPACE'], exist_ok=True)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Global variable to track running tasks
+# Global variables
 running_tasks = {}
-# Global AskHuman tool instance
 ask_human_tool = AskHuman()
 
 
@@ -1055,3 +1089,188 @@ def submit_response():
     ask_human_tool.submit_response(question_id, response)
 
     return jsonify({'status': 'success', 'message': 'Response submitted'})
+
+# VM Monitoring and System Health Endpoints
+@app.route('/api/system/health')
+def system_health():
+    """Get system health status"""
+    try:
+        health_data = vm_manager.get_system_health()
+        return jsonify(health_data)
+    except Exception as e:
+        logger.error(f"Error getting system health: {e}")
+        return jsonify({'error': 'Failed to get system health'}), 500
+
+@app.route('/api/system/metrics')
+def system_metrics():
+    """Get current system metrics"""
+    try:
+        metrics = vm_manager.get_current_metrics()
+        return jsonify(metrics)
+    except Exception as e:
+        logger.error(f"Error getting system metrics: {e}")
+        return jsonify({'error': 'Failed to get system metrics'}), 500
+
+@app.route('/api/system/metrics/history')
+def system_metrics_history():
+    """Get system metrics history"""
+    try:
+        hours = request.args.get('hours', 1, type=int)
+        history = vm_manager.get_metrics_history(hours)
+        return jsonify({'history': history})
+    except Exception as e:
+        logger.error(f"Error getting metrics history: {e}")
+        return jsonify({'error': 'Failed to get metrics history'}), 500
+
+@app.route('/api/system/alerts')
+def system_alerts():
+    """Get system alerts"""
+    try:
+        max_alerts = request.args.get('max', 50, type=int)
+        alerts = vm_manager.get_alerts(max_alerts)
+        return jsonify({'alerts': alerts})
+    except Exception as e:
+        logger.error(f"Error getting system alerts: {e}")
+        return jsonify({'error': 'Failed to get system alerts'}), 500
+
+@app.route('/api/system/optimize')
+def system_optimize():
+    """Get VM optimization recommendations"""
+    try:
+        recommendations = vm_manager.optimize_for_vm()
+        return jsonify(recommendations)
+    except Exception as e:
+        logger.error(f"Error getting optimization recommendations: {e}")
+        return jsonify({'error': 'Failed to get optimization recommendations'}), 500
+
+@app.route('/api/models/status')
+def model_status():
+    """Get AI model statuses"""
+    try:
+        statuses = vm_manager.get_model_statuses()
+        return jsonify({'models': statuses})
+    except Exception as e:
+        logger.error(f"Error getting model statuses: {e}")
+        return jsonify({'error': 'Failed to get model statuses'}), 500
+
+@app.route('/api/websocket/stats')
+def websocket_stats():
+    """Get WebSocket connection statistics"""
+    try:
+        active_users = websocket_manager.get_active_users()
+        room_stats = websocket_manager.get_room_stats()
+        return jsonify({
+            'active_users': active_users,
+            'room_stats': room_stats
+        })
+    except Exception as e:
+        logger.error(f"Error getting WebSocket stats: {e}")
+        return jsonify({'error': 'Failed to get WebSocket stats'}), 500
+
+# Room Management Endpoints
+@app.route('/api/rooms', methods=['GET'])
+def get_rooms():
+    """Get list of available chat rooms"""
+    try:
+        rooms = ChatRoom.query.filter_by(is_active=True).all()
+        rooms_data = [room.to_dict() for room in rooms]
+        return jsonify({'rooms': rooms_data})
+    except Exception as e:
+        logger.error(f"Error getting rooms: {e}")
+        return jsonify({'error': 'Failed to get rooms'}), 500
+
+@app.route('/api/rooms', methods=['POST'])
+def create_room():
+    """Create a new chat room"""
+    try:
+        from flask_login import login_required, current_user
+        
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        is_public = data.get('is_public', True)
+        
+        if not name:
+            return jsonify({'error': 'Room name is required'}), 400
+        
+        # Check if room name already exists
+        existing_room = ChatRoom.query.filter_by(name=name).first()
+        if existing_room:
+            return jsonify({'error': 'Room name already exists'}), 400
+        
+        room = ChatRoom(
+            name=name,
+            description=description,
+            is_public=is_public,
+            created_by=current_user.id if hasattr(current_user, 'id') else None
+        )
+        
+        db.session.add(room)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Room created successfully',
+            'room': room.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating room: {e}")
+        return jsonify({'error': 'Failed to create room'}), 500
+
+def initialize_database():
+    """Initialize database with default data"""
+    try:
+        with app.app_context():
+            # Create all tables
+            db.create_all()
+            
+            # Create default admin user if no users exist
+            if User.query.count() == 0:
+                admin_user = User(
+                    username='admin',
+                    email='admin@openmanus.ai',
+                    full_name='System Administrator',
+                    role=UserRole.ADMIN
+                )
+                admin_user.set_password('admin123')  # Change this in production!
+                db.session.add(admin_user)
+                
+                # Create default chat room
+                general_room = ChatRoom(
+                    name='General',
+                    description='General discussion room',
+                    is_public=True,
+                    created_by=admin_user.id
+                )
+                db.session.add(general_room)
+                
+                db.session.commit()
+                logger.info("Created default admin user and general room")
+            
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+
+if __name__ == "__main__":
+    # Initialize database
+    initialize_database()
+    
+    # Start VM monitoring
+    vm_manager.start_monitoring(interval=30)
+    
+    # Create necessary directories at startup
+    os.makedirs(app.config['WORKSPACE'], exist_ok=True)
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Start the Flask app with SocketIO
+    logger.info("Starting Enhanced OpenManus AI Platform...")
+    logger.info("Features: Multi-user auth, WebSocket chat, VM monitoring, AI models")
+    
+    # Use SocketIO's run method instead of Flask's run
+    websocket_manager.socketio.run(
+        app, 
+        host='0.0.0.0', 
+        port=5000, 
+        debug=False,
+        allow_unsafe_werkzeug=True
+    )
